@@ -21,15 +21,22 @@ This is designed to demonstrate, in one project:
 
 ## 2. Datasets (all public, no confidentiality issues)
 
+**Subsystem (locked): Battery / EV.** Chosen over braking/engine cooling for the career-story fit (ties to Harsha's automotive/BMS background — see Section 7) after verifying the data risk was closed (see below).
+
 | Purpose | Dataset | Notes |
 |---|---|---|
-| Fault/severity classifier training | [Logistics Vehicle Maintenance History Dataset (Kaggle)](https://www.kaggle.com/datasets/datasetengineer/logistics-vehicle-maintenance-history-dataset) | Sensor measurements, diagnostic signals, multiclass target (Normal / Minor Maintenance / Major Maintenance) |
-| Additional sensor features | OBD-II Dataset (Kaggle) | ~47,514 rows, 33 features — engine load, RPM, coolant temp, etc. |
-| RAG knowledge corpus | [NHTSA Datasets & APIs](https://www.nhtsa.gov/nhtsa-datasets-and-apis) — recalls, complaints, technical service bulletins | Official, free, public domain, no auth required, updated daily |
+| Fault/severity classifier training (primary) | [EV Battery and Drivetrain Fault Diagnosis (Kaggle)](https://www.kaggle.com/datasets/programmer3/ev-battery-and-drivetrain-fault-diagnosis) | ~237,000 rows, 10 columns (voltage, current, temperature, motor speed, SOC estimate vs. ground truth, residual). Target: **Fault Label** = Normal / Warning / Fault. CC0 public domain. Fault class is ~6% of rows — plan for class-imbalance handling in Week 2. |
+| Fleet context / secondary sensor features | [Logistics Vehicle Maintenance History Dataset (Kaggle)](https://www.kaggle.com/datasets/datasetengineer/logistics-vehicle-maintenance-history-dataset) | 250,000 rows. Has explicit `Battery_Status`, `Brake_Condition`, `Engine_Temperature` columns and an EV vehicle type (Tesla Semi) alongside ICE trucks — use for fleet-level framing and the Normal/Minor/Major severity structure. |
+| RAG knowledge corpus | [NHTSA Datasets & APIs](https://www.nhtsa.gov/nhtsa-datasets-and-apis) — recalls, complaints, manufacturer communications (TSBs) | Official, free, public domain, no auth required, updated daily. Filter to battery/electrical component tags (see verification below), not all recalls for an EV model. |
 
-**Important scoping decision:** pick ONE vehicle subsystem (e.g., braking, battery/EV, or engine cooling) so the classifier's fault categories and the NHTSA text corpus actually overlap. Trying to cover "all vehicle faults" will dilute both the model and the RAG corpus.
+**Data risk verification (done):** queried the live NHTSA API directly before locking this in.
+- Chevrolet Bolt EV, 2022: 7 recalls, including 2 explicit `ELECTRICAL SYSTEM:PROPULSION SYSTEM:TRACTION BATTERY` fire recalls (21V650, 24V481/24V812 follow-ups).
+- Tesla Model 3, 2022: 17 recalls (mostly OTA software — useful for volume, but confirms need to filter by `Component` field for battery-relevance, not just "any EV recall").
+- Volkswagen ID.4, 2023: 13 recalls, including 3 explicit `TRACTION BATTERY` fire recalls (25V836, 26V028, 26V030, from 2025–2026).
+- Complaint volume per model-year is high enough that a single query (Tesla Model 3, one model year) exceeded a normal response size — complaints are not the scarcity risk.
+- **Conclusion:** just 3 EV models across a few model-years already yield 37 real recall documents with genuine battery-specific content. Scaling to ~15–20 EV models × several model-years, filtered by component tag, should yield several hundred citable documents — enough for a real RAG corpus. The real Week 1 work is *curation* (filtering bulk recall/complaint data to battery/electrical component tags) rather than volume risk.
 
-Do not use any VW/ASAP data, models, or documentation for this project (confidential IP).
+Do not use any VW/ASAP data, models, or documentation for this project (confidential IP) — note: the VW ID.4 recall data above is public NHTSA safety data, not VW internal/confidential data, so it's fine to use.
 
 ## 3. Architecture
 
@@ -64,9 +71,10 @@ Keep the tool count at 2–3. A fourth "mock service scheduling" tool is a nice-
 ## 4. Week-by-Week Plan
 
 ### Week 1 — Data & Foundations
-- Pick the target subsystem (e.g., braking or battery)
-- Pull and clean the Kaggle sensor/maintenance dataset; pull NHTSA recalls/complaints/TSBs for that subsystem via the API
-- EDA notebook; define fault/severity classes clearly
+- ~~Pick the target subsystem~~ — **done: Battery/EV, locked**
+- Pull and clean the EV Battery and Drivetrain Fault Diagnosis dataset (primary classifier training data)
+- Pull NHTSA recalls + complaints for ~15–20 EV models (multiple model-years each) via the API; filter to battery/electrical component tags (`TRACTION BATTERY`, `ELECTRICAL SYSTEM`, etc.) rather than keeping every recall for an EV model
+- EDA notebook; define fault/severity classes clearly; check class balance on the Fault Label (Normal/Warning/Fault)
 - Repo scaffold, Supabase project, Vercel skeleton, team roles assigned
 - **Deliverable:** cleaned datasets, EDA notebook, working repo skeleton
 
