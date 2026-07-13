@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Env / secrets
+.env
+.env.*
+
+# Data (large/raw files — keep out of git, document sources in docs/)
+data/*
+!data/.gitkeep
+
+# Media (large files)
+media/*.mp4
+media/*.mov
+
+# OS
+.DS_Store
+
+# Node (if frontend added later)
+node_modules/
