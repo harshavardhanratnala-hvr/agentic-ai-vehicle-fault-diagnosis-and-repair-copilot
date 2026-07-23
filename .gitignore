@@ -9,6 +9,7 @@ venv/
 # Env / secrets
 .env
 .env.*
+!.env.example
 
 # Data (large/raw files — keep out of git, document sources in docs/)
 data/*
