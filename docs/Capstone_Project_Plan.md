@@ -15,7 +15,7 @@ This is designed to demonstrate, in one project:
 - **Deployment & monitoring** — a live app with logged agent traces, not a notebook
 
 **Target user (locked):**
-- **Primary persona — Fleet maintenance manager.** Operates a fleet of vehicles (logistics/delivery/trucking). Question they ask the system: "This truck just threw a fault signal — is it safe to keep driving, or do I pull it in now?" This maps directly onto the Kaggle dataset's target classes (Normal / Minor Maintenance / Major Maintenance), which are themselves a fleet-triage decision. Use this persona as the headline demo narrative.
+- **Primary persona — Fleet maintenance manager.** Operates a fleet of vehicles (logistics/delivery/trucking). Question they ask the system: "This truck just threw a fault signal — is it safe to keep driving, or do I pull it in now?" This maps directly onto the classifier's **Fault Label** classes (Normal / Warning / Fault — derived from the dataset's DTC codes, see Section 2), themselves a fleet-triage decision. Use this persona as the headline demo narrative.
 - **Secondary persona — Junior diagnostic engineer at an OEM/dealer.** Question they ask: "What's the root cause of this code, has it been seen before, is there a recall/bulletin, what's the repair procedure?" Same underlying agent output (classification + severity + cited NHTSA records + suggested repair steps) serves this persona too — mention it as a "this generalizes beyond one persona" line in the pitch, not as a second headline. Don't split the demo narrative across both; pick one voice for the story and note the other as an extension.
 - **Important:** the system diagnoses and recommends — it does not perform the physical repair. It's a copilot for the human (fleet manager or engineer), who still makes the final call.
 
@@ -25,9 +25,11 @@ This is designed to demonstrate, in one project:
 
 | Purpose | Dataset | Notes |
 |---|---|---|
-| Fault/severity classifier training (primary) | [EV Battery and Drivetrain Fault Diagnosis (Kaggle)](https://www.kaggle.com/datasets/programmer3/ev-battery-and-drivetrain-fault-diagnosis) | ~237,000 rows, 10 columns (voltage, current, temperature, motor speed, SOC estimate vs. ground truth, residual). Target: **Fault Label** = Normal / Warning / Fault. CC0 public domain. Fault class is ~6% of rows — plan for class-imbalance handling in Week 2. |
+| Fault/severity classifier training (primary) | [EV Sensors: Driving Pattern Diagnostics (2020-24) (Kaggle)](https://www.kaggle.com/datasets/kunalm95/ev-sensors-driving-pattern-diagnostics-2020-24) | 175,200 rows — 4 EVs × 5 years, hourly. Real named DTCs (`P0MR` motor RPM, `P0MT` motor temp, `P0T` general temp, `P0P` pressure, `P0B` battery, `P0S` SOC/SOH) alongside SOC/SOH/battery temp/motor RPM/torque/temp/brake wear/tire pressure sensors. Derive **Fault Label** = Normal / Warning / Fault from DTC presence/count/severity. 1.63% of rows carry any DTC — realistic imbalance, handling required in Week 2. **CC BY 4.0** (attribution only). Verified genuine signal: a Random Forest predicting fault-from-sensors gets AUC 0.9999 / F1 0.995, driven sensibly by Motor_RPM/Motor_Torque/Motor_Temp — matches the DTC names. |
 | Fleet context / secondary sensor features | [Logistics Vehicle Maintenance History Dataset (Kaggle)](https://www.kaggle.com/datasets/datasetengineer/logistics-vehicle-maintenance-history-dataset) | 250,000 rows. Has explicit `Battery_Status`, `Brake_Condition`, `Engine_Temperature` columns and an EV vehicle type (Tesla Semi) alongside ICE trucks — use for fleet-level framing and the Normal/Minor/Major severity structure. |
 | RAG knowledge corpus | [NHTSA Datasets & APIs](https://www.nhtsa.gov/nhtsa-datasets-and-apis) — recalls, complaints, manufacturer communications (TSBs) | Official, free, public domain, no auth required, updated daily. Filter to battery/electrical component tags (see verification below), not all recalls for an EV model. |
+
+**Dataset swap (Week 1):** the originally planned primary dataset — *EV Battery and Drivetrain Fault Diagnosis* (`programmer3/ev-battery-and-drivetrain-fault-diagnosis`) — was removed from Kaggle sometime after this plan was written (404 on the dataset page, not in search, not among that user's current datasets). This took two rounds of evaluation to replace safely; full trial history, including a dataset that was briefly locked in and then reversed after failing a signal test, is documented in [`docs/Dataset_Selection_Log.md`](./Dataset_Selection_Log.md). Final choice: **EV Sensors: Driving Pattern Diagnostics** (see table above).
 
 **Data risk verification (done):** queried the live NHTSA API directly before locking this in.
 - Chevrolet Bolt EV, 2022: 7 recalls, including 2 explicit `ELECTRICAL SYSTEM:PROPULSION SYSTEM:TRACTION BATTERY` fire recalls (21V650, 24V481/24V812 follow-ups).
@@ -72,14 +74,16 @@ Keep the tool count at 2–3. A fourth "mock service scheduling" tool is a nice-
 
 ### Week 1 — Data & Foundations
 - ~~Pick the target subsystem~~ — **done: Battery/EV, locked**
-- Pull and clean the EV Battery and Drivetrain Fault Diagnosis dataset (primary classifier training data)
-- Pull NHTSA recalls + complaints for ~15–20 EV models (multiple model-years each) via the API; filter to battery/electrical component tags (`TRACTION BATTERY`, `ELECTRICAL SYSTEM`, etc.) rather than keeping every recall for an EV model
-- EDA notebook; define fault/severity classes clearly; check class balance on the Fault Label (Normal/Warning/Fault)
-- Repo scaffold, Supabase project, Vercel skeleton, team roles assigned
+- ~~Pull and clean the primary classifier training dataset~~ (see Section 2 for the current dataset — the originally planned one was removed from Kaggle mid-Week-1 and replaced; full trial history in `docs/Dataset_Selection_Log.md`) — **done**
+- ~~Pull NHTSA recalls + complaints for ~15–20 EV models (multiple model-years each) via the API; filter to battery/electrical component tags (`TRACTION BATTERY`, `ELECTRICAL SYSTEM`, etc.) rather than keeping every recall for an EV model~~ — **done** (202 recalls + 3,329 complaints filtered, `data/raw/nhtsa/`)
+- ~~EDA notebook; define fault/severity classes clearly; check class balance on the Fault Label (Normal/Warning/Fault)~~ — **done** (`notebooks/01_eda.ipynb`; Normal 98.37% / Fault 1.51% / Warning 0.12% — more imbalanced than originally estimated)
+- Repo scaffold — **done** (requirements.txt, src/, .env.example). Supabase project, Vercel skeleton, team roles assigned — **not started**, need Harsha's own account setup
 - **Deliverable:** cleaned datasets, EDA notebook, working repo skeleton
 
 ### Week 2 — Train Classifier + Build RAG
 - Train baseline (Random Forest/XGBoost) then a small neural net classifier; evaluate with F1/confusion matrix, handle class imbalance
+  - **Split methodology (decided in `notebooks/01_eda.ipynb` Section 8-9, not a random row split):** chronological, per-vehicle — hold out the most recent ~20% of each of the 4 vehicles' timelines as test. A random row-level split risks leaking adjacent-hour sensor autocorrelation between train/test even though fault episodes themselves turned out to be 95.7% single isolated hours, not multi-hour runs.
+  - **Evaluation:** report both the 3-class `Fault_Label` breakdown (Normal/Warning/Fault — matches the plan's triage framing) and a binary Normal-vs-Any-Issue rollup. `Warning` has only ~205 rows total (~40 in test) — treat its metrics as directional, not a confident estimate; the binary rollup is the statistically reliable headline number.
 - Chunk NHTSA text, embed with a pretrained Hugging Face sentence-transformer, load into pgvector
 - Test retrieval quality manually on a handful of known queries
 - **Deliverable:** trained classifier with metrics; working retrieval demo (input query → relevant NHTSA passages)
