@@ -1,6 +1,6 @@
 # Capstone Project Plan: Agentic AI Vehicle Fault Diagnosis & Repair Copilot
 
-**Team:** Harsha Vardhan Ratnala + capstone teammates
+**Team:** Harsha, Ghada, Hüseyin
 **Program:** neue fische Data Science & AI Bootcamp
 **Duration:** 4 weeks
 
@@ -81,8 +81,14 @@ Keep the tool count at 2–3. A fourth "mock service scheduling" tool is a nice-
 - **Deliverable:** cleaned datasets, EDA notebook, working repo skeleton
 
 ### Week 2 — Train Classifier + Build RAG
+- **Realistic product framing:** the classifier's input never comes from a human typing in sensor values — it comes automatically from the vehicle's existing telemetry feed (this is how real connected-fleet telematics already works). The only UI surface a person sees is the fault alert + agent diagnosis, never a 10-field data-entry form. For the demo (no live telemetry integration in scope), this gets simulated by replaying real held-out rows through the pipeline as if they arrived live — a documented scope decision, not an oversight.
+- **Feature relevance, before finalizing the feature set:**
+  - Rank the 10 sensor columns (`SOC`, `SOH`, `Charging_Cycles`, `Battery_Temp`, `Motor_RPM`, `Motor_Torque`, `Motor_Temp`, `Brake_Pad_Wear`, `Charging_Voltage`, `Tire_Pressure`) with `sklearn.feature_selection.mutual_info_classif` against `Fault_Label`, as a second, non-linear-aware check alongside the Random Forest importances already observed during dataset selection (`Motor_RPM`/`Motor_Torque`/`Motor_Temp` dominated there, consistent with the Fault-tier DTCs being motor/battery codes).
+  - `Brake_Pad_Wear`, `Charging_Voltage`, and `Tire_Pressure` are expected to rank low for this Battery/EV-locked target (tire pressure in particular maps to a Warning-tier code, not Fault) — don't treat all 10 columns as equally important without checking.
+  - **Feature-level leakage confirmed:** none of the 10 sensor columns are threshold/limit columns or otherwise mechanically derived from the `DTC` column itself (unlike the rejected 5-year EV battery candidate in `docs/Dataset_Selection_Log.md`, whose `*_limit_*` columns were explicitly excluded for this reason). Worth re-confirming this explicitly on the final dataset, not just inferring it from the candidate-selection process.
 - Train baseline (Random Forest/XGBoost) then a small neural net classifier; evaluate with F1/confusion matrix, handle class imbalance
   - **Split methodology (decided in `notebooks/01_eda.ipynb` Section 8-9, not a random row split):** chronological, per-vehicle — hold out the most recent ~20% of each of the 4 vehicles' timelines as test. A random row-level split risks leaking adjacent-hour sensor autocorrelation between train/test even though fault episodes themselves turned out to be 95.7% single isolated hours, not multi-hour runs.
+  - **Leakage discipline during training (not yet implemented, flagged so it isn't skipped):** fit any preprocessing (scaling, imputing) and class-imbalance handling (class weighting / SMOTE) only on the training fold, then apply to test — never fit on the combined dataset. Tune hyperparameters against a validation split carved out of training data, not the test set.
   - **Evaluation:** report both the 3-class `Fault_Label` breakdown (Normal/Warning/Fault — matches the plan's triage framing) and a binary Normal-vs-Any-Issue rollup. `Warning` has only ~205 rows total (~40 in test) — treat its metrics as directional, not a confident estimate; the binary rollup is the statistically reliable headline number.
 - Chunk NHTSA text, embed with a pretrained Hugging Face sentence-transformer, load into pgvector
 - Test retrieval quality manually on a handful of known queries

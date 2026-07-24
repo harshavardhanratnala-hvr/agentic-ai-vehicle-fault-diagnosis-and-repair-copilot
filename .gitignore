@@ -22,5 +22,8 @@ media/*.mov
 # OS
 .DS_Store
 
+# Office lock/temp files
+~$*
+
 # Node (if frontend added later)
 node_modules/
