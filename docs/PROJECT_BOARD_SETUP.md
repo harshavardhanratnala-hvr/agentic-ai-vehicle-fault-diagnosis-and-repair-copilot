@@ -78,3 +78,43 @@ This mirrors how real engineering teams run sprints: milestone = sprint, label =
 board columns = state, issue = unit of work. Everything here traces back to
 `docs/Capstone_Project_Plan.md`, so if the plan changes, update the plan first and then
 add/edit issues to match — the plan stays the source of truth.
+
+## 7. Getting the data
+
+`data/` is gitignored, so cloning the repo does not give teammates any of the actual
+files. There are two different kinds of data here, and they need two different fixes.
+
+**Public, reproducible data (Kaggle) — redownload it, don't transfer it.**
+This is the raw EV driving-pattern/diagnostics dataset. Anyone can regenerate it exactly,
+so the right move is to fetch it fresh rather than pass files around:
+
+```bash
+pip install kaggle
+# then place your kaggle.json API token in ~/.kaggle/ (kaggle.com -> Account -> Create New API Token)
+kaggle datasets download -d kunalm95/ev-sensors-driving-pattern-diagnostics-2020-24
+unzip ev-sensors-driving-pattern-diagnostics-2020-24.zip -d data/raw/driving_pattern_diagnostics
+```
+
+**Custom-derived data — needs a shared link, because it can't be regenerated with one command.**
+This is the cleaned CSV and the filtered NHTSA corpus. Only the person who built them has
+the exact files, so they need to go up to a shared drive:
+
+1. Go to [drive.google.com](https://drive.google.com) (or Dropbox, whichever you already use).
+2. Create a new folder, e.g. `Bolt Capstone Data` (or `Vehicle Fault Copilot Data`).
+3. Upload exactly these files/folders from your local `data/`:
+   - `data/processed/driving_pattern_diagnostics_cleaned.csv`
+   - `data/raw/nhtsa/` (the whole folder — `recalls_battery_electrical.csv`,
+     `complaints_battery_electrical.csv`, `recalls_raw.json`, `complaints_raw.json`)
+   - Do **not** upload the raw `data/raw/driving_pattern_diagnostics/` CSVs — teammates get
+     those via the Kaggle command above instead.
+   - The three `logistics_*` CSVs in `data/raw/` are leftover from earlier dataset
+     exploration and aren't part of the current Battery/EV scope — no need to share those.
+4. Right-click the folder → **Share** → set access to "Anyone with the link" (Viewer is
+   enough) → **Copy link**.
+5. Paste that link here once it exists, and share it with the team in your usual channel
+   (Slack/Discord/etc).
+6. Teammates: download the folder, then place its contents at the matching paths shown
+   above relative to the repo root (`data/processed/...`, `data/raw/nhtsa/...`) so the
+   notebooks/scripts find them without any path changes.
+
+_Shared data link: https://drive.google.com/drive/folders/1aJGqBF6QGjHpCxvL5Dpfi9t_AuMcJBpD?usp=share_link_
