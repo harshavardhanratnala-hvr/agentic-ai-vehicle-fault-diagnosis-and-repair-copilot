@@ -46,26 +46,25 @@ Do not use any VW/ASAP data, models, or documentation for this project (confiden
 Sensor/DTC input
       │
       ▼
-[Agent Orchestrator (LLM + tool-calling)]
-      │
-      ├── Tool 1: classify_fault()      → fine-tuned classifier (trained model)
-      ├── Tool 2: search_recalls_tsbs() → RAG over NHTSA corpus (pretrained HF embeddings)
-      └── Tool 3: generate_ticket()     → LLM composes structured, cited repair ticket
-      │
-      ▼
-Dashboard (submit fault → view agent's reasoning trace → final ticket)
-      │
-      ▼
-Logging/monitoring (success rate, escalation rate, latency)
+[Streamlit app]
+  ├── Agent Orchestrator (LLM + tool-calling, in-process)
+  │     ├── Tool 1: classify_fault()      → fine-tuned classifier (trained model)
+  │     ├── Tool 2: search_recalls_tsbs() → RAG over NHTSA corpus (pretrained HF embeddings)
+  │     └── Tool 3: generate_ticket()     → LLM composes structured, cited repair ticket
+  │
+  ├── Dashboard (submit fault → view agent's reasoning trace → final ticket)
+  │
+  └── Logging/monitoring → Supabase/Postgres (success rate, escalation rate, latency)
 ```
 
-**Stack suggestion:**
+**Architecture decision (updated from the original Next.js/Vercel/FastAPI split):** a single Streamlit app, not a separate frontend + backend. Locked in 2026-07-27 because the team (Ghada, Hüseyin, Harsha) knows Python from the bootcamp, not necessarily React/Next.js/JS tooling — a split stack would mean either double the surface area to learn in 4 weeks, or one person siloed on frontend while the rest can't touch it. The Streamlit app calls `classify_fault()` / `search_recalls_tsbs()` / `generate_ticket()` directly in-process and writes each run's log straight to Supabase — no separate REST API layer. Trade-off, stated explicitly: less "production microservice" separation of concerns than the original plan — acceptable for a 4-week capstone demo, where the agent's reasoning trace and grounded output matter more to evaluators than deployable-service boundaries.
+
+**Stack:**
 - Classifier: scikit-learn baseline → small neural net (MLP/1D-CNN), Python
 - RAG: pretrained sentence-transformer (Hugging Face) embeddings, pgvector (Supabase) as the vector store
-- Agent: simple function-calling loop (OpenAI/Anthropic function calling, or LangChain/LangGraph if the team wants the framework)
-- Frontend: Next.js (reuse Harsha's existing stack)
-- Backend: Python (FastAPI) hosting the agent + classifier
-- Deployment: Vercel (frontend) + GCP Cloud Run (backend)
+- Agent: simple function-calling loop (OpenAI/Anthropic function calling, or LangChain/LangGraph if the team wants the framework), called in-process from the Streamlit app
+- App: Streamlit (single app — UI + agent + classifier + logging calls, no separate frontend/backend split)
+- Deployment: Streamlit Community Cloud, deployed straight from the GitHub repo — no separate frontend/backend deploy pipeline to run
 - Logging: Supabase/Postgres table storing each agent run's tool calls and outputs
 
 Keep the tool count at 2–3. A fourth "mock service scheduling" tool is a nice-to-have — cut it first if time runs short.
@@ -77,7 +76,7 @@ Keep the tool count at 2–3. A fourth "mock service scheduling" tool is a nice-
 - ~~Pull and clean the primary classifier training dataset~~ (see Section 2 for the current dataset — the originally planned one was removed from Kaggle mid-Week-1 and replaced; full trial history in `docs/Dataset_Selection_Log.md`) — **done**
 - ~~Pull NHTSA recalls + complaints for ~15–20 EV models (multiple model-years each) via the API; filter to battery/electrical component tags (`TRACTION BATTERY`, `ELECTRICAL SYSTEM`, etc.) rather than keeping every recall for an EV model~~ — **done** (202 recalls + 3,329 complaints filtered, `data/raw/nhtsa/`)
 - ~~EDA notebook; define fault/severity classes clearly; check class balance on the Fault Label (Normal/Warning/Fault)~~ — **done** (`notebooks/01_eda.ipynb`; Normal 98.37% / Fault 1.51% / Warning 0.12% — more imbalanced than originally estimated)
-- Repo scaffold — **done** (requirements.txt, src/, .env.example). Supabase project, Vercel skeleton, team roles assigned — **not started**, need Harsha's own account setup
+- Repo scaffold — **done** (requirements.txt, src/, .env.example). Supabase project, Streamlit skeleton, team roles assigned — **not started**, need account setup + role decisions
 - **Deliverable:** cleaned datasets, EDA notebook, working repo skeleton
 
 ### Week 2 — Train Classifier + Build RAG
@@ -95,14 +94,14 @@ Keep the tool count at 2–3. A fourth "mock service scheduling" tool is a nice-
 - **Deliverable:** trained classifier with metrics; working retrieval demo (input query → relevant NHTSA passages)
 
 ### Week 3 — Agent Orchestration
-- Build the tool-calling agent loop combining classify → retrieve → generate
+- Build the tool-calling agent loop combining classify → retrieve → generate, as functions called directly from the Streamlit app (no separate API service — see Section 3)
 - Add guardrails: don't let the LLM invent remedies not present in retrieved text; handle empty-retrieval gracefully
 - Log every agent run (tool calls, inputs/outputs, final ticket) to the database
-- **Deliverable:** end-to-end agent (CLI or simple API) that takes a sensor input and produces a cited repair ticket
+- **Deliverable:** end-to-end agent (callable from a script or notebook) that takes a sensor input and produces a cited repair ticket
 
 ### Week 4 — Deployment, Evaluation, Presentation
-- Build the dashboard: submit a fault → see the agent's step-by-step trace → see the final ticket; add a small "ops" view showing run counts/escalation rate/latency
-- Deploy frontend + backend; smoke-test end to end
+- Build the dashboard (Streamlit): submit a fault → see the agent's step-by-step trace → see the final ticket; add a small "ops" view showing run counts/escalation rate/latency
+- Deploy to Streamlit Community Cloud from the GitHub repo; smoke-test end to end
 - Run a real evaluation: retrieval precision on a labeled set of test questions, classifier metrics, 5–10 documented end-to-end test cases (include at least one failure case and how the system handled it)
 - Write the architecture README + prepare the presentation/demo script
 - **Deliverable:** live deployed app, evaluation results, final presentation
