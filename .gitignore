@@ -15,6 +15,9 @@ venv/
 data/*
 !data/.gitkeep
 
+# Trained model artifacts (regenerate by rerunning the notebooks)
+models/
+
 # Media (large files)
 media/*.mp4
 media/*.mov
