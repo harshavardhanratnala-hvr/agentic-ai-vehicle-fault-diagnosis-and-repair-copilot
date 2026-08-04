@@ -4,8 +4,10 @@ kaggle
 python-dotenv
 scikit-learn
 xgboost
+tensorflow
 matplotlib
 seaborn
 jupyter
 streamlit
+numpy
 tensorflow
