@@ -9,3 +9,4 @@ seaborn
 jupyter
 streamlit
 lightgbm
+tensorflow
