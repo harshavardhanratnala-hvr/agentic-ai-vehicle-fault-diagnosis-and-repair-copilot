@@ -10,3 +10,4 @@ seaborn
 jupyter
 streamlit
 numpy
+tensorflow
