@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Commit conventions
+
+Never add a `Co-Authored-By: Claude` (or similar Anthropic/AI attribution) trailer to commit messages, and never add Claude as a GitHub co-author, contributor, or committer identity. Commits should list only the human team members (Harsha, Ghada, Hüseyin) as authors. This applies to every commit in this repo, going forward, with no exceptions.
+
 ## Project state
 
 This repo is currently in the **Week 1 (Data & Foundations)** stage of a 4-week capstone. `src/` and `notebooks/` are empty scaffolding — there is no build, lint, or test tooling yet because no code has been written. Do not assume a stack is installed; check for a `requirements.txt`/`pyproject.toml` or `package.json` before running any command, and create one as part of the first real implementation task if it's missing.

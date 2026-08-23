@@ -30,3 +30,5 @@ media/*.mov
 
 # Node (if frontend added later)
 node_modules/
+._*
+.DS_Store
